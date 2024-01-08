@@ -1,25 +1,25 @@
-from fourinarowGame import Neljansuora
+from fourinarowGui import Gui_4iar
 from aiPlayer import aiPlayer
 import itertools
 
 
 def main():
-    gui = Neljansuora()
-    p1 = aiPlayer("red")
-    p2 = aiPlayer("yellow")
+    gui = Gui_4iar()
+    p1 = aiPlayer("P1")
+    p2 = aiPlayer("P2")
 
-    while gui.voiton_tarkastus() == False:
-        p1.set_state(gui.pelilauta())
-        p2.set_state(gui.pelilauta())
-        if gui.vuorossa() == "p1":
-            gui.pelimerkin_pudotus(p1.choose_action())
+    while gui.getGame().getResults() == False:
+        p1.set_state(gui.getGame().getGameBoard())
+        p2.set_state(gui.getGame().getGameBoard())
+        if gui.getGame().getInturn() == "P1":
+            gui.drop(p1.choose_action())
         else:
-            gui.pelimerkin_pudotus(p2.choose_action())
+            gui.drop(p2.choose_action())
 
     gui.start()
 
     p1 = aiPlayer("red")
-    p1.set_state(gui.pelilauta())
+    p1.set_state(gui.getGame().getGameBoard())
     print(p1.get_state())
     print(p1.get_available_actions())
 

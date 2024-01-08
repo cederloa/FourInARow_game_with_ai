@@ -4,18 +4,17 @@ import numpy as np
 import random
 
 class aiPlayer:
-    def __init__(self, color):
-        self.COLOR_TRANSLATION = {"red": "punainen", "yellow": "keltainen"}
+    def __init__(self, id):
         self.__possible_actions = range(0,7)
-        self.__color = self.COLOR_TRANSLATION[color]
+        self.__id = id
 
 
     def set_state(self, table):
         state_as_list = []
         for column in table:
             state_column = list(map(lambda x:
-                                    0 if x=="tyhja" else 
-                                    1 if x==self.__color else
+                                    0 if x==None else 
+                                    1 if x==self.__id else
                                     -1, column))
             state_as_list.append(state_column)
         self.__state = np.array(state_as_list)
