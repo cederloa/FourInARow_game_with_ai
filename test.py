@@ -18,10 +18,8 @@ def main():
 
     gui.start()
 
-    p1 = aiPlayer("red")
-    p1.set_state(gui.getGame().getGameBoard())
-    print(p1.get_state())
-    print(p1.get_available_actions())
+    #print(p1.get_state())
+    #print(p1.get_available_actions())
 
 if __name__ == '__main__':
     main()
