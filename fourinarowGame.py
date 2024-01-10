@@ -8,6 +8,10 @@ class FourinarowGame:
 
 
     def playTurn(self, col):
+        """
+        Plays a turn for the current player.
+        Returns None if invalid move.
+        """
         row = 0
         for tile in self.__gameboard[col]:
             if tile == None:
