@@ -2,11 +2,23 @@
 
 import numpy as np
 import random
+from models.dqn import Dqn
 
 class aiPlayer:
-    def __init__(self, id):
+    def __init__(self, id, model="random"):
         self.__possible_actions = range(0,7)
         self.__id = id
+        self.__known_models = {"dqn": None, "random": self.randomModel}
+
+        # Check if given model is valid
+        if isinstance(model, Dqn):
+            self.__model = model
+        if model not in self.__known_models:
+            raise ValueError(f"Model \"{model}\" not found.")
+        elif self.__known_models[model] == None:
+            raise NotImplementedError(f"Model \"{model}\" not implemented.")
+        else:
+            self.__model = self.__known_models[model]
 
 
     def set_state(self, table):
@@ -25,10 +37,15 @@ class aiPlayer:
     
 
     def get_available_actions(self):
+        # Maybe move this to fourinarowGame
         return [i for i, col in enumerate(self.__state) if 0 in col]
+    
+
+    def randomModel(self):
+        return random.choice(self.get_available_actions())
     
 
     def choose_action(self):
         # Currently random actions chosen
         # TODO: Implement RL agent (in another file)
-        return random.choice(self.get_available_actions())
+        return self.__model()
