@@ -3,6 +3,7 @@
 import numpy as np
 import random
 from models.dqn import Dqn
+import torch
 
 class aiPlayer:
     def __init__(self, id, model="random"):
@@ -13,7 +14,7 @@ class aiPlayer:
         # Check if given model is valid
         if isinstance(model, Dqn):
             self.__model = model
-        if model not in self.__known_models:
+        elif model not in self.__known_models:
             raise ValueError(f"Model \"{model}\" not found.")
         elif self.__known_models[model] == None:
             raise NotImplementedError(f"Model \"{model}\" not implemented.")
@@ -41,11 +42,32 @@ class aiPlayer:
         return [i for i, col in enumerate(self.__state) if 0 in col]
     
 
+    def get_id(self):
+        return self.__id
+    
+
     def randomModel(self):
         return random.choice(self.get_available_actions())
     
 
-    def choose_action(self):
+    def choose_action(self, rnd=False):
         # Currently random actions chosen
         # TODO: Implement RL agent (in another file)
-        return self.__model()
+
+        # Even if the player's model is not random, the player can choose a
+        # random (off-policy) action.
+        if rnd:
+            return self.randomModel()
+
+        # Random model returns an action, but dqn returns an one-hot encoding of
+        # all actions. Perform differently based on which model is used.
+        if self.__model == self.randomModel:
+            return self.__model()
+        else:
+            # Format the state tensor and feed it to the model
+            device = torch.device("cuda" if torch.cuda.is_available()
+                                  else "cpu")
+            st_tensor = torch.from_numpy(self.__state).float().to(device)
+            st_tensor = st_tensor[None, :]  # Adding channel dim
+            oneHot_actions = self.__model(st_tensor).cpu().detach().numpy()
+            return np.argmax(oneHot_actions[self.get_available_actions()])
