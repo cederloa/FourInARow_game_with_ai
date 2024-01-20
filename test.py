@@ -1,12 +1,17 @@
 from fourinarowGui import Gui_4iar
 from aiPlayer import aiPlayer
 import itertools
+import torch
+from models.dqn import Dqn
 
 
 def main():
+    RLmodel = torch.load("models/savedModels/firstModel.pt")
+    initModel = torch.load("models/savedModels/initModel.pt")
+
     gui = Gui_4iar()
-    p1 = aiPlayer("P1")
-    p2 = aiPlayer("P2")
+    p1 = aiPlayer("P1", model=RLmodel)
+    p2 = aiPlayer("P2", model="random")
 
     while gui.getGame().getResults() == False:
         p1.set_state(gui.getGame().getGameBoard())
