@@ -10,6 +10,10 @@ from matplotlib import pyplot as plt
 import copy
 
 
+# Global variables
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
 def makeAMove(player, game, E):
     # Get the current player's state of the game
     player.set_state(game.getGameBoard())
@@ -27,12 +31,10 @@ def makeAMove(player, game, E):
     return game, state, action, new_state
 
 
-def trainLoop(policyNet=None, episodes=2, E=0.5):
+def trainLoop(policyNet=None, episodes=10, E=0.5):
     G = 0.9  # Discount factor
-    T = 0.1  # Update rate
-    LR = 1e-3  # Learning rate
+    LR = 1e-2  # Learning rate
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if policyNet == None:
         policyNet = Dqn()  # Updated after all episodes, and saved (?) Moves are made based on this.
     policyNet.to(device)
@@ -56,7 +58,7 @@ def trainLoop(policyNet=None, episodes=2, E=0.5):
     # save the states, actions and rewards for training
     for ep in range(episodes):
         sa_memory = []  # For saving states and actions
-        game = FourinarowGame(p1.get_id(), p2.get_id())
+        game = FourinarowGame(p1, p2)
         temp_losses = []
         # Play the game until it ends
         while game.getResults() == False:
@@ -74,6 +76,11 @@ def trainLoop(policyNet=None, episodes=2, E=0.5):
             action_memory.append(action)
             new_state_memory.append(new_state)
             reward_memory.append(reward)
+
+
+            if game.getInturn().get_model_name() == "random":
+                # Do not try to train random model
+                continue
                     
                     
         # Optimize model (in epochs)
@@ -111,11 +118,7 @@ def trainLoop(policyNet=None, episodes=2, E=0.5):
             temp_losses.append(loss.cpu().detach().numpy())
         train_losses.append(np.mean(temp_losses))
 
-    # Visualize losses
-    plt.plot(train_losses)
-    plt.show()
-
-    return policyNet
+    return policyNet, train_losses
 
 
 def visualizeWeights(model):
@@ -124,16 +127,31 @@ def visualizeWeights(model):
         for filter in np_filters:
             plt.imshow(np.squeeze(filter), cmap='gray')
             plt.show()
-        break
+        return np_filters
             
 
 if __name__ == "__main__":
     E_start = 0.9  # Initial probability to choose random action
     E_end = 0.1  # Final probability to choose random action
-    model = trainLoop(None, 100, E_start)
-    model = trainLoop(model, 100, 0.5)
-    model = trainLoop(model, 1000, E_end)
-    visualizeWeights(model)
-    torch.save(model, "models/savedModels/firstModel.pt")
+    epsilon = np.arange(E_start, E_end, -0.1)
 
+    model = Dqn()
+    model.to(device)
 
+    # Train with decreasing epsilon and save the losses for visualization
+    all_losses = []
+    episodes = 5000
+    for e in epsilon:
+        print(e)
+        model, step_losses = trainLoop(model, episodes, e)
+        all_losses += step_losses
+    
+    model, step_losses = trainLoop(model, episodes, E_end)
+    all_losses += step_losses
+
+    torch.save(model, "models/savedModels/9step_5000ep_model.pt")
+
+    # Visualize losses and weights
+    plt.plot(all_losses)
+    plt.show()
+    #end_filters = visualizeWeights(model)
