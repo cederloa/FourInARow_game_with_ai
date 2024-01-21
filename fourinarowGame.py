@@ -1,10 +1,20 @@
+from aiPlayer import player, aiPlayer
+
 class FourinarowGame:
     # TODO: create an abstract class "player" and have two such players be
     # parameters of a game. aiPlayer and humanPlayer inherit the abstract class
-    def __init__(self, p1Id="P1", p2Id="P2"):
-        self.__p1Id = p1Id
-        self.__p2Id = p2Id
-        self.__inturn = self.__p1Id
+    def __init__(self, p1="P1", p2="P2"):
+        if isinstance(p1, str):
+            self.__p1 = player(p1)
+            self.__p2 = player(p2)
+            self.__p1Id = p1
+            self.__p2Id = p2
+        elif isinstance(p1, aiPlayer):
+            self.__p1 = p1
+            self.__p2 = p2
+            self.__p1Id = p1.get_id()
+            self.__p2Id = p2.get_id()
+        self.__inturn = self.__p1
         self.__gameboard = []
         for i in range(7):
             self.__gameboard.append([])
@@ -19,12 +29,12 @@ class FourinarowGame:
         row = 0
         for tile in self.__gameboard[col]:
             if tile == None:
-                if self.__inturn == self.__p1Id:
+                if self.__inturn == self.__p1:
                     self.__gameboard[col][row] = self.__p1Id
-                    self.__inturn = self.__p2Id
+                    self.__inturn = self.__p2
                 else:
                     self.__gameboard[col][row] = self.__p2Id
-                    self.__inturn = self.__p1Id
+                    self.__inturn = self.__p1
                 return row
             else:
                 row += 1
