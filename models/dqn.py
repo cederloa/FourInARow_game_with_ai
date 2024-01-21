@@ -8,7 +8,7 @@ class Dqn(nn.Module):
     def __init__(self, input_shape=(6,7),
                         n_actions=7,
                         in_channels=1,
-                        n_channels=3):
+                        n_channels=12):
         super(Dqn, self).__init__()
 
         # Define some layers
