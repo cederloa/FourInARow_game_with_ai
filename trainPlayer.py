@@ -7,6 +7,7 @@ import torch
 import random
 import numpy as np
 from matplotlib import pyplot as plt
+import copy
 
 
 def makeAMove(player, game, E):
@@ -36,7 +37,6 @@ def trainLoop(policyNet=None, episodes=2, E=0.5):
         policyNet = Dqn()  # Updated after all episodes, and saved (?) Moves are made based on this.
     policyNet.to(device)
     targetNet = Dqn().to(device)  # Updated after every episode, based on policyNet (?)
-
     # Load the policyNet state to targetNet
     targetNet.load_state_dict(policyNet.state_dict())
 
@@ -44,15 +44,20 @@ def trainLoop(policyNet=None, episodes=2, E=0.5):
     p2 = aiPlayer("P2", policyNet)
 
     optimizer = torch.optim.AdamW(policyNet.parameters(), lr=LR)
-    #lossFunction = torch.nn.SmoothL1Loss()
     lossFunction = torch.nn.MSELoss()
     train_losses = []
+
+    state_memory = []
+    action_memory = []
+    new_state_memory = []
+    reward_memory = []
 
     # Play the game for a certain amount of episodes (1 episode = 1 game) and
     # save the states, actions and rewards for training
     for ep in range(episodes):
         sa_memory = []  # For saving states and actions
         game = FourinarowGame(p1.get_id(), p2.get_id())
+        temp_losses = []
         # Play the game until it ends
         while game.getResults() == False:
             if game.getInturn() == p1.get_id():
@@ -65,45 +70,41 @@ def trainLoop(policyNet=None, episodes=2, E=0.5):
             else:
                 reward = 1
 
-            sa_memory.append({"state":state,
-                              "action":action,
-                              "new_state":new_state,
-                              "reward":reward})
-        
-    
-        # Optimize model
-        epochs = 10
-        batch_size = 1
-        temp_losses = []
-        for epoch in range(epochs):
-            batch = random.sample(sa_memory, batch_size)
-            #batch = [sa_memory[-1]]
-            #print(batch[0]["state"])
+            state_memory.append(state)
+            action_memory.append(action)
+            new_state_memory.append(new_state)
+            reward_memory.append(reward)
+                    
+                    
+        # Optimize model (in epochs)
+        #epochs = 10
+        #batch_size = 1
+        #for epoch in range(epochs):
+            #batch_i = random.sample(range(len(state_memory)), batch_size)
+            #b_states = torch.from_numpy(np.array(state_memory)[batch_i]).float().to(device)
+            #b_actions = torch.from_numpy(np.array(action_memory)[batch_i]).to(device)
+            #b_new_states = torch.from_numpy(np.array(new_state_memory)[batch_i]).float().to(device)
+            #b_rewards = torch.from_numpy(np.array(reward_memory)[batch_i]).to(device)
+
+            # Optimize model
+
+            b_states = torch.tensor(state).float().to(device)
+            b_actions = torch.tensor(action).to(device)
+            b_new_states = torch.tensor(new_state).float().to(device)
+            b_rewards = torch.tensor(reward).to(device)
 
             # Prepare samples for DQN
-            st_tensor = torch.from_numpy(batch[0]["state"]).float().to(device)
-            st_tensor = st_tensor[None, :]
-            newSt_tensor = torch.from_numpy(batch[0]["new_state"]).float().to(device)
-            newSt_tensor = newSt_tensor[None, :]
-            
-            # TODO: Change the loss so that it is localized for the taken action
-
+            b_states = b_states[None, :]
+            b_new_states = b_new_states[None, :]
 
             # Q-value for the current state
-            old_Q = policyNet(st_tensor)[batch[0]["action"]]
+            Q_pred = policyNet(b_states)
             # New Q calculated with r and max Q at next state
             # (Target net: "ground truth")
-            new_Q = batch[0]["reward"] + G*torch.max(targetNet(newSt_tensor))
+            Q_target = 1 * Q_pred
+            Q_target[b_actions] = b_rewards + G * torch.max(targetNet(b_new_states))
 
-            #old_Q_array = np.zeros(7)
-            #old_Q_array[batch[0]["action"]] = old_Q
-            #new_Q_array = np.zeros(7)
-            #new_Q_array[batch[0]["action"]] = new_Q
-
-
-            #print(f"old: {old_Q}")
-            #print(f"new: {new_Q}")
-            loss = lossFunction(old_Q, new_Q)
+            loss = lossFunction(Q_pred, Q_target)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -111,7 +112,6 @@ def trainLoop(policyNet=None, episodes=2, E=0.5):
         train_losses.append(np.mean(temp_losses))
 
     # Visualize losses
-    print(len(train_losses))
     plt.plot(train_losses)
     plt.show()
 
@@ -132,7 +132,7 @@ if __name__ == "__main__":
     E_end = 0.1  # Final probability to choose random action
     model = trainLoop(None, 100, E_start)
     model = trainLoop(model, 100, 0.5)
-    model = trainLoop(model, 100, E_end)
+    model = trainLoop(model, 1000, E_end)
     visualizeWeights(model)
     torch.save(model, "models/savedModels/firstModel.pt")
 
