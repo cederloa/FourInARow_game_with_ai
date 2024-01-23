@@ -11,7 +11,10 @@ import copy
 
 
 # Global variables
+G = 0.9  # Discount factor
+LR = 1e-3  # Learning rate
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+lossFunction = torch.nn.MSELoss()
 
 
 def makeAMove(player, game, E):
@@ -26,15 +29,40 @@ def makeAMove(player, game, E):
 
     # Get the current player's new state of the game
     player.set_state(game.getGameBoard())
-    new_state = player.get_state()
+    new_state = -1 * player.get_state()
 
     return game, state, action, new_state
 
 
-def trainLoop(policyNet=None, episodes=10, E=0.5):
-    G = 0.9  # Discount factor
-    LR = 1e-2  # Learning rate
+def optimize(state, action, new_state, reward, policyNet, targetNet, optimizer):
+    # Optimize model
+    b_states = torch.tensor(state).float().to(device)
+    b_actions = torch.tensor(action).to(device)
+    b_new_states = torch.tensor(new_state).float().to(device)
+    b_rewards = torch.tensor(reward).to(device)
 
+    # Prepare samples for DQN
+    b_states = b_states[None, :]
+    b_new_states = b_new_states[None, :]
+
+    # Q-value for the current state
+    Q_pred = policyNet(b_states)
+    # New Q calculated with r and max Q at next state
+    # (Target net: "ground truth")
+    Q_target = 1 * Q_pred
+    Q_target[b_actions] = (G * (1 - torch.max(targetNet(b_new_states)))
+                           if b_rewards == 0
+                           else b_rewards)
+
+    loss = lossFunction(Q_pred, Q_target)
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
+    
+    return loss.cpu().detach().numpy()
+
+
+def trainLoop(policyNet=None, episodes=10, E=0.5):
     if policyNet == None:
         policyNet = Dqn()  # Updated after all episodes, and saved (?) Moves are made based on this.
     policyNet.to(device)
@@ -42,27 +70,22 @@ def trainLoop(policyNet=None, episodes=10, E=0.5):
     # Load the policyNet state to targetNet
     targetNet.load_state_dict(policyNet.state_dict())
 
-    p1 = aiPlayer("P1", policyNet)
-    p2 = aiPlayer("P2", policyNet)
-
     optimizer = torch.optim.AdamW(policyNet.parameters(), lr=LR)
-    lossFunction = torch.nn.MSELoss()
     train_losses = []
 
-    state_memory = []
-    action_memory = []
-    new_state_memory = []
-    reward_memory = []
+    prev_state = None
+    prev_action = None
 
     # Play the game for a certain amount of episodes (1 episode = 1 game) and
     # save the states, actions and rewards for training
     for ep in range(episodes):
-        sa_memory = []  # For saving states and actions
+        p1 = aiPlayer("P1", policyNet)
+        p2 = aiPlayer("P2", policyNet)
         game = FourinarowGame(p1, p2)
         temp_losses = []
         # Play the game until it ends
         while game.getResults() == False:
-            if game.getInturn() == p1.get_id():
+            if game.getInturn() == p1:
                 game, state, action, new_state = makeAMove(p1, game, E)
             else:
                 game, state, action, new_state = makeAMove(p2, game, E)
@@ -71,51 +94,22 @@ def trainLoop(policyNet=None, episodes=10, E=0.5):
                 reward = 0
             else:
                 reward = 1
-
-            state_memory.append(state)
-            action_memory.append(action)
-            new_state_memory.append(new_state)
-            reward_memory.append(reward)
-
+                # Give the loser a -1 reward, and train with it
+                temp_loss = optimize(prev_state, prev_action, state, -1, policyNet, targetNet, optimizer)
+                temp_losses.append(temp_loss)
 
             if game.getInturn().get_model_name() == "random":
                 # Do not try to train random model
                 continue
-                    
-                    
-        # Optimize model (in epochs)
-        #epochs = 10
-        #batch_size = 1
-        #for epoch in range(epochs):
-            #batch_i = random.sample(range(len(state_memory)), batch_size)
-            #b_states = torch.from_numpy(np.array(state_memory)[batch_i]).float().to(device)
-            #b_actions = torch.from_numpy(np.array(action_memory)[batch_i]).to(device)
-            #b_new_states = torch.from_numpy(np.array(new_state_memory)[batch_i]).float().to(device)
-            #b_rewards = torch.from_numpy(np.array(reward_memory)[batch_i]).to(device)
+            
+            # Optimize on each turn played
+            temp_loss = optimize(state, action, new_state, reward, policyNet, targetNet, optimizer)
+            temp_losses.append(temp_loss)
 
-            # Optimize model
+            prev_state = state
+            prev_action = action
 
-            b_states = torch.tensor(state).float().to(device)
-            b_actions = torch.tensor(action).to(device)
-            b_new_states = torch.tensor(new_state).float().to(device)
-            b_rewards = torch.tensor(reward).to(device)
-
-            # Prepare samples for DQN
-            b_states = b_states[None, :]
-            b_new_states = b_new_states[None, :]
-
-            # Q-value for the current state
-            Q_pred = policyNet(b_states)
-            # New Q calculated with r and max Q at next state
-            # (Target net: "ground truth")
-            Q_target = 1 * Q_pred
-            Q_target[b_actions] = b_rewards + G * torch.max(targetNet(b_new_states))
-
-            loss = lossFunction(Q_pred, Q_target)
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            temp_losses.append(loss.cpu().detach().numpy())
+        # Save mean of losses for current episode
         train_losses.append(np.mean(temp_losses))
 
     return policyNet, train_losses
@@ -133,23 +127,23 @@ def visualizeWeights(model):
 if __name__ == "__main__":
     E_start = 0.9  # Initial probability to choose random action
     E_end = 0.1  # Final probability to choose random action
-    epsilon = np.arange(E_start, E_end, -0.1)
+    steps = 9
+    epsilon = np.linspace(E_start, E_end, steps)
 
     model = Dqn()
+    #model = torch.load("models/savedModels/12channels/9step_100ep_model.pt")
     model.to(device)
 
     # Train with decreasing epsilon and save the losses for visualization
     all_losses = []
-    episodes = 5000
+    episodes = 100
     for e in epsilon:
         print(e)
         model, step_losses = trainLoop(model, episodes, e)
         all_losses += step_losses
-    
-    model, step_losses = trainLoop(model, episodes, E_end)
-    all_losses += step_losses
 
-    torch.save(model, "models/savedModels/9step_5000ep_model.pt")
+    torch.save(model,
+        f"models/savedModels/12channels/{steps}step_{episodes}ep_model.pt")
 
     # Visualize losses and weights
     plt.plot(all_losses)
