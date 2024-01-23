@@ -50,7 +50,7 @@ def optimize(state, action, new_state, reward, policyNet, targetNet, optimizer):
     # New Q calculated with r and max Q at next state
     # (Target net: "ground truth")
     Q_target = 1 * Q_pred
-    Q_target[b_actions] = (G * (1 - torch.max(targetNet(b_new_states)))
+    Q_target[b_actions] = (G * (-1 * torch.max(policyNet(b_new_states)))
                            if b_rewards == 0
                            else b_rewards)
 
@@ -58,6 +58,12 @@ def optimize(state, action, new_state, reward, policyNet, targetNet, optimizer):
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
+
+
+    #print(Q_pred)
+    #print(Q_target)
+    #print(policyNet(b_states))
+    #print()
     
     return loss.cpu().detach().numpy()
 
@@ -131,7 +137,7 @@ if __name__ == "__main__":
     epsilon = np.linspace(E_start, E_end, steps)
 
     model = Dqn()
-    #model = torch.load("models/savedModels/12channels/9step_100ep_model.pt")
+    #model = torch.load("models/savedModels/simpleNet/90step_100ep_model.pt")
     model.to(device)
 
     # Train with decreasing epsilon and save the losses for visualization
@@ -143,7 +149,7 @@ if __name__ == "__main__":
         all_losses += step_losses
 
     torch.save(model,
-        f"models/savedModels/12channels/{steps}step_{episodes}ep_model.pt")
+        f"models/savedModels/simpleNet/{steps}step_{episodes}ep_model.pt")
 
     # Visualize losses and weights
     plt.plot(all_losses)
