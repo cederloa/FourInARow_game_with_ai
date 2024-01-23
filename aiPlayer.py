@@ -76,7 +76,15 @@ class aiPlayer:
             st_tensor = torch.from_numpy(self.__state).float().to(device)
             st_tensor = st_tensor[None, :]  # Adding channel dim
             oneHot_actions = self.__model(st_tensor).cpu().detach().numpy()
-            return np.argmax(oneHot_actions[self.get_available_actions()])
+
+            # TODO: THIS NOW CHOOSES THE WRONG ACTION BECAUSE E.G. IF AVAILABLE
+            # ACTIONS ARE [0, 1, 2, 4, 5, 6], INDEX 5 MEANS ACTION 6
+
+            ar_dict = {k: v for k, v in enumerate(oneHot_actions)
+                       if k in self.get_available_actions()}
+            max_a = max(ar_dict, key=ar_dict.get)
+
+            return max_a
 
 
 class player:
