@@ -7,7 +7,7 @@ import torch
 import random
 import numpy as np
 from matplotlib import pyplot as plt
-import copy
+import time
 
 
 # Global variables
@@ -34,7 +34,10 @@ def makeAMove(player, game, E):
     return game, state, action, new_state
 
 
-def optimize(state, action, new_state, reward, policyNet, targetNet, optimizer):
+def optimize(state, action, new_state, reward, policyNet, optimizer, targetNet=None):
+    if targetNet == None:
+        targetNet = policyNet
+    
     # Optimize model
     b_states = torch.tensor(state).float().to(device)
     b_actions = torch.tensor(action).to(device)
@@ -58,25 +61,27 @@ def optimize(state, action, new_state, reward, policyNet, targetNet, optimizer):
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
-
-
-    #print(Q_pred)
-    #print(Q_target)
-    #print(policyNet(b_states))
-    #print()
     
     return loss.cpu().detach().numpy()
 
 
-def trainLoop(policyNet=None, episodes=10, E=0.5):
-    if policyNet == None:
-        policyNet = Dqn()  # Updated after all episodes, and saved (?) Moves are made based on this.
-    policyNet.to(device)
-    targetNet = Dqn().to(device)  # Updated after every episode, based on policyNet (?)
+def trainLoop(policyNet1=None, policyNet2=None, episodes=10, E=0.5):
+    if policyNet1 == None:
+        policyNet1 = Dqn()  # Updated after all episodes, and saved (?) Moves are made based on this.
+    
+    if policyNet2 == None:
+        policyNet2 = Dqn()
+    
+    policyNet1.to(device)
+    policyNet2.to(device)
+    
+    #targetNet = Dqn().to(device)  # Updated after every episode, based on policyNet (?)
+    
     # Load the policyNet state to targetNet
-    targetNet.load_state_dict(policyNet.state_dict())
+    #targetNet.load_state_dict(policyNet1.state_dict())
 
-    optimizer = torch.optim.AdamW(policyNet.parameters(), lr=LR)
+    optimizer1 = torch.optim.AdamW(policyNet1.parameters(), lr=LR)
+    optimizer2 = torch.optim.AdamW(policyNet2.parameters(), lr=LR)
     train_losses = []
 
     prev_state = None
@@ -85,15 +90,23 @@ def trainLoop(policyNet=None, episodes=10, E=0.5):
     # Play the game for a certain amount of episodes (1 episode = 1 game) and
     # save the states, actions and rewards for training
     for ep in range(episodes):
-        p1 = aiPlayer("P1", policyNet)
-        p2 = aiPlayer("P2", policyNet)
+        p1 = aiPlayer("P1", policyNet1)
+        p2 = aiPlayer("P2", policyNet1)
         game = FourinarowGame(p1, p2)
         temp_losses = []
         # Play the game until it ends
         while game.getResults() == False:
             if game.getInturn() == p1:
+                optimizer = optimizer1
+                policyNet = policyNet1
+                other_opt = optimizer2
+                other_pol = policyNet2
                 game, state, action, new_state = makeAMove(p1, game, E)
             else:
+                optimizer = optimizer2
+                policyNet = policyNet2
+                other_opt = optimizer1
+                other_pol = policyNet1
                 game, state, action, new_state = makeAMove(p2, game, E)
 
             if game.getResults() == False or game.getResults() == "Draw":
@@ -101,7 +114,8 @@ def trainLoop(policyNet=None, episodes=10, E=0.5):
             else:
                 reward = 1
                 # Give the loser a -1 reward, and train with it
-                temp_loss = optimize(prev_state, prev_action, state, -1, policyNet, targetNet, optimizer)
+                temp_loss = optimize(prev_state, prev_action, state, -1,
+                                     other_pol, other_opt, policyNet)
                 temp_losses.append(temp_loss)
 
             if game.getInturn().get_model_name() == "random":
@@ -109,7 +123,8 @@ def trainLoop(policyNet=None, episodes=10, E=0.5):
                 continue
             
             # Optimize on each turn played
-            temp_loss = optimize(state, action, new_state, reward, policyNet, targetNet, optimizer)
+            temp_loss = optimize(state, action, new_state, reward,
+                                 policyNet, optimizer, other_pol)
             temp_losses.append(temp_loss)
 
             prev_state = state
@@ -131,25 +146,29 @@ def visualizeWeights(model):
             
 
 if __name__ == "__main__":
-    E_start = 0.9  # Initial probability to choose random action
-    E_end = 0.1  # Final probability to choose random action
-    steps = 9
+    E_start = 0.1  # Initial probability to choose random action
+    E_end = 0.01  # Final probability to choose random action
+    steps = 2
     epsilon = np.linspace(E_start, E_end, steps)
 
-    model = Dqn()
+    p1_model = Dqn()
+    p2_model = Dqn()
     #model = torch.load("models/savedModels/simpleNet/90step_100ep_model.pt")
-    model.to(device)
+    p1_model.to(device)
+    p2_model.to(device)
 
     # Train with decreasing epsilon and save the losses for visualization
     all_losses = []
-    episodes = 100
+    episodes = 1000
     for e in epsilon:
         print(e)
-        model, step_losses = trainLoop(model, episodes, e)
+        model, step_losses = trainLoop(p1_model, p2_model, episodes, e)
         all_losses += step_losses
 
-    torch.save(model,
-        f"models/savedModels/simpleNet/{steps}step_{episodes}ep_model.pt")
+    torch.save(p1_model,
+        f"models/savedModels/dualCnn/{steps}step_{episodes}ep_model_p1_noAct.pt")
+    torch.save(p2_model,
+        f"models/savedModels/dualCnn/{steps}step_{episodes}ep_model_p2_noAct.pt")
 
     # Visualize losses and weights
     plt.plot(all_losses)
