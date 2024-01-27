@@ -9,11 +9,13 @@ from models.dqn import Dqn
 
 
 def main():
-    #RLmodel1 = torch.load("models/savedModels/12channels/9step_100ep_model.pt")
-    RLmodel2 = torch.load("models/savedModels/simpleNet/90step_100ep_model.pt")
+    RLmodel1 = torch.load("models/savedModels/simpleNet/90step_100ep_model.pt")
+
+    #RLmodel1 = torch.load("models/savedModels/dualCnn/2step_1000ep_model_p1_noAct.pt")
+    RLmodel2 = torch.load("models/savedModels/dualCnn/2step_1000ep_model_p2_noAct.pt")
 
     gui = Gui_4iar()
-    p1 = aiPlayer("P1", model=RLmodel2)
+    p1 = aiPlayer("P1", model=RLmodel1)
     p2 = aiPlayer("P2", model=RLmodel2)
 
     while gui.getGame().getResults() == False:
