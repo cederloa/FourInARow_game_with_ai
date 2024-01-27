@@ -12,7 +12,7 @@ class Dqn(nn.Module):
         super(Dqn, self).__init__()
 
         # Define some layers
-        self.conv1 = nn.Conv2d(in_channels=in_channels,
+        self.conv1_1 = nn.Conv2d(in_channels=in_channels,
                       out_channels=n_channels,
                       kernel_size=(3, 3))
 
@@ -34,7 +34,7 @@ class Dqn(nn.Module):
         x = self.conv1_1(x)
         x = torch.flatten(x, start_dim=0, end_dim=-1)
         x = self.linear1(x)
-        x = torch.tanh(x)
+        #x = torch.tanh(x)
         return x
     
 
@@ -43,7 +43,7 @@ class Dqn(nn.Module):
         x = self.conv2_2(x)
         x = torch.flatten(x, start_dim=0, end_dim=-1)
         x = self.linear1(x)
-        x = torch.tanh(x)
+        #x = torch.tanh(x)
         return x
 
     
