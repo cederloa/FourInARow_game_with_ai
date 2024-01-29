@@ -4,13 +4,12 @@ import itertools
 import torch
 from models.dqn import Dqn
 
-# NOTE:
-# The model does not know how to avoid losing. Find a way to give -1 rewards
-
 
 def main():
+    '''
+    Play one game with two AIs. Visualize the outcome with gui.
+    '''
     RLmodel1 = torch.load("models/savedModels/simpleNet/90step_100ep_model.pt")
-
     #RLmodel1 = torch.load("models/savedModels/dualCnn/2step_1000ep_model_p1_noAct.pt")
     RLmodel2 = torch.load("models/savedModels/dualCnn/2step_1000ep_model_p2_noAct.pt")
 
